@@ -47,8 +47,13 @@ async function finish(session) {
   var name = meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'Jogador');
   var avatar = meta.avatar_url || meta.picture || '';
   msg.textContent = 'Salvando seu perfil…';
-  var res = await sb.from('player_profiles').upsert({ login_code: code, user_id: u.id, name: name, avatar_url: avatar, email: u.email || '' }, { onConflict: 'login_code' });
-  if (res.error) { msg.textContent = 'Algo deu errado ao salvar o perfil. Feche esta página e tente de novo pelo jogo.'; return; }
+    var perfil = { login_code: code, user_id: u.id, name: name, avatar_url: avatar, email: u.email || '' };
+  var res = await sb.from('player_profiles').insert(perfil);
+  if (res.error && res.error.code === '23505') {
+    var chk = await sb.rpc('get_login_profile', { p_code: code });
+    if (chk.data && chk.data.length) res = { error: null };
+  }
+  if (res.error) { msg.textContent = 'Algo deu errado ao salvar o perfil (' + (res.error.message || res.error.code || 'erro') + '). Feche esta página e tente de novo pelo jogo.'; return; }
   msg.textContent = 'Pronto, ' + name.split(' ')[0] + '! ✅ Pode voltar ao jogo.';
   btn.style.display = 'none';
   form.style.display = 'none';
