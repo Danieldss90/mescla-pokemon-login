@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar — Mescla Pokémon</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:system-ui,sans-serif;background:#0e2a1e;color:#eafff2;display:flex;min-height:100vh;margin:0;align-items:center;justify-content:center}
+.card{background:#143826;border:1px solid #2a5c40;border-radius:16px;padding:28px;max-width:340px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+h1{font-size:22px;margin:0 0 8px}
+p{opacity:.9;line-height:1.45}
+button{background:#ffd83d;color:#222;border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;width:100%}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🌿 Mescla Pokémon</h1>
+<p id="msg">Conectando…</p>
+<button id="btn" style="display:none">Entrar com Google</button>
+</div>
+<script>
+var SB_URL = "https://llcssfybvmcvlmkdfycj.supabase.co";
+var SB_KEY = "sb_publishable_YtzUJIjZO-bqqGFDU7CyhQ_hzMZx_CB";
+var sb = supabase.createClient(SB_URL, SB_KEY);
+var params = new URLSearchParams(location.search);
+var code = params.get('code') || localStorage.getItem('mp_code') || '';
+if (params.get('code')) localStorage.setItem('mp_code', code);
+var msg = document.getElementById('msg');
+var btn = document.getElementById('btn');
+async function finish(session) {
+  var u = session.user;
+  var meta = u.user_metadata || {};
+  var name = meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'Jogador');
+  var avatar = meta.avatar_url || meta.picture || '';
+  msg.textContent = 'Salvando seu perfil…';
+  var res = await sb.from('player_profiles').upsert({ login_code: code, user_id: u.id, name: name, avatar_url: avatar, email: u.email || '' }, { onConflict: 'login_code' });
+  if (res.error) { msg.textContent = 'Algo deu errado ao salvar o perfil. Feche esta página e tente de novo pelo jogo.'; return; }
+  msg.textContent = 'Pronto, ' + name.split(' ')[0] + '! ✅ Pode voltar ao jogo.';
+  btn.style.display = 'none';
+  localStorage.removeItem('mp_code');
+  await sb.auth.signOut();
+}
+async function init() {
+  var r = await sb.auth.getSession();
+  if (r.data.session) { await finish(r.data.session); return; }
+  if (!code) { msg.textContent = 'Abra esta página pelo botão "Entrar com Google" dentro do jogo.'; return; }
+  msg.textContent = 'Toque no botão para entrar com a sua conta Google:';
+  btn.style.display = 'block';
+  btn.onclick = async function () {
+    var redirect = location.origin + location.pathname + '?code=' + encodeURIComponent(code);
+    await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirect } });
+  };
+}
+init();
+</script>
+</body>
+</html>
